@@ -1,0 +1,161 @@
+#!/usr/bin/python3
+import speech_recognition as sr
+import pyttsx3
+import subprocess
+import urllib.parse
+
+# ----------------------------
+# Initialize Speech Engine
+# ----------------------------
+engine = pyttsx3.init()
+voices = engine.getProperty("voices")
+if len(voices) > 1:
+    engine.setProperty("voice", voices[1].id)  # Female voice if available
+engine.setProperty("rate", 150)
+
+def speak(text):
+    print(f"FRIDAY: {text}")
+    engine.say(text)
+    engine.runAndWait()
+
+# ----------------------------
+# Speech Recognizer
+# ----------------------------
+recognizer = sr.Recognizer()
+recognizer.energy_threshold = 200
+recognizer.dynamic_energy_threshold = True
+
+# ----------------------------
+# Installed apps mapping
+# ----------------------------
+app_commands = {
+    "discord": "discord",
+    "terminal": "gnome-terminal",
+    "kitty": "kitty",
+    "google": "google-chrome",
+    "firefox": "firefox",
+    "code": "code",
+    "files": "nautilus"
+}
+
+# ----------------------------
+# Predefined official websites
+# ----------------------------
+special_websites = {
+    "chatgpt": "https://chat.openai.com",
+    "x": "https://x.com",
+    "linkedin": "https://www.linkedin.com",
+    "amazon": "https://www.amazon.in",
+    "apple": "https://www.apple.com",
+    "samsung": "https://www.samsung.com",
+    "youtube": "https://www.youtube.com",
+    "whatsapp": "https://web.whatsapp.com"
+}
+
+# ----------------------------
+# Execute command
+# ----------------------------
+def execute_command(command):
+    words = command.lower().split()
+    if not words:
+        return
+
+    # ----------- Open apps / websites -----------
+    if words[0] == "open" and len(words) > 1:
+        target = words[1]
+
+        # Installed applications
+        if target in app_commands:
+            try:
+                subprocess.Popen([app_commands[target]])
+                speak(f"Opening {target}")
+            except Exception:
+                speak(f"Could not open {target}")
+
+        # Official websites
+        elif target in special_websites:
+            subprocess.Popen(["google-chrome", special_websites[target]])
+            speak(f"Opening {target}")
+
+        # Unknown → Google search
+        else:
+            query = urllib.parse.quote(" ".join(words[1:]))
+            url = f"https://www.google.com/search?q={query}"
+            subprocess.Popen(["google-chrome", url])
+            speak(f"Searching for {target}")
+        return
+
+    # ----------- Close installed apps -----------
+    if words[0] == "close" and len(words) > 1:
+        target = words[1]
+        if target in app_commands:
+            try:
+                subprocess.Popen(["pkill", "-f", app_commands[target]])
+                speak(f"Closed {target}")
+            except Exception:
+                speak(f"Couldn't close {target}")
+        return
+
+    # ----------- System settings -----------
+    if words[0] in ["wifi", "bluetooth", "brightness"]:
+        if words[0] == "wifi":
+            if "on" in words:
+                subprocess.run(["nmcli", "radio", "wifi", "on"])
+                speak("Wi-Fi turned on")
+            elif "off" in words:
+                subprocess.run(["nmcli", "radio", "wifi", "off"])
+                speak("Wi-Fi turned off")
+
+        elif words[0] == "bluetooth":
+            if "on" in words:
+                subprocess.run(["rfkill", "unblock", "bluetooth"])
+                subprocess.run(["bluetoothctl", "power", "on"])
+                speak("Bluetooth turned on")
+            elif "off" in words:
+                subprocess.run(["rfkill", "block", "bluetooth"])
+                speak("Bluetooth turned off")
+
+        elif words[0] == "brightness" and len(words) > 1:
+            try:
+                percent = int(words[1].replace("%", ""))
+                max_brightness_path = "/sys/class/backlight/intel_backlight/max_brightness"
+                with open(max_brightness_path) as f:
+                    max_brightness = int(f.read().strip())
+                value = int(max_brightness * percent / 100)
+                subprocess.run(
+                    f"echo {value} | sudo tee /sys/class/backlight/intel_backlight/brightness",
+                    shell=True
+                )
+                speak(f"Brightness set to {percent} percent")
+            except:
+                speak("Couldn't change brightness")
+        return
+
+    # ----------- Exit program -----------
+    if words[0] in ["quit", "exit", "goodbye"]:
+        speak("Goodbye, Sarvesh!")
+        exit()
+
+# ----------------------------
+# Listen function
+# ----------------------------
+def listen():
+    with sr.Microphone() as source:
+        print("🎤 Listening...")
+        audio = recognizer.listen(source, timeout=None, phrase_time_limit=5)
+        try:
+            command = recognizer.recognize_google(audio, language="en-IN")
+            print(f"👉 Recognized: {command}")
+            execute_command(command)
+        except sr.UnknownValueError:
+            print("⚠️ Didn't catch that")
+        except sr.RequestError:
+            print("⚠️ Could not request results. Check internet.")
+
+# ----------------------------
+# Main program
+# ----------------------------
+if __name__ == "__main__":
+    speak("Friday is online.")
+    while True:
+        listen()
