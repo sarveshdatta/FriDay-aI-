@@ -24,7 +24,7 @@
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/sarveshdatta/Nothing-AI-.git
+git clone https://github.com/sarveshdatta/FriDay-aI-.git
 ```
 
 2. **Install dependencies**
